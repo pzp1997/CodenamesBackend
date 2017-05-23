@@ -12150,11 +12150,9 @@ var _user$project$Vector$innerProduct = F2(
 		return (_user$project$Vector$getX(v) * _user$project$Vector$getX(w)) + (_user$project$Vector$getY(v) * _user$project$Vector$getY(w));
 	});
 var _user$project$Vector$zero = {ctor: '_Tuple2', _0: 0, _1: 0};
-var _user$project$Grid$foldRightBottom = F5(
-	function (combine, combineRows, base, baseRow, grid) {
-		var foldRow = function (row) {
-			return A3(_elm_lang$core$Array$foldr, combine, base, row);
-		};
+var _user$project$Grid$genericFold = F7(
+	function (foldh, foldv, combine, combineRows, base, baseRow, grid) {
+		var foldRow = A2(foldh, combine, base);
 		var foldAndCombineRow = F2(
 			function (row, acc) {
 				return A2(
@@ -12162,33 +12160,24 @@ var _user$project$Grid$foldRightBottom = F5(
 					foldRow(row),
 					acc);
 			});
-		return A3(_elm_lang$core$Array$foldr, foldAndCombineRow, baseRow, grid);
+		return A3(foldv, foldAndCombineRow, baseRow, grid);
 	});
-var _user$project$Grid$foldLeftTop = F5(
-	function (combine, combineRows, base, baseRow, grid) {
-		var foldRow = function (row) {
-			return A3(_elm_lang$core$Array$foldl, combine, base, row);
-		};
-		var foldAndCombineRow = F2(
-			function (row, acc) {
-				return A2(
-					combineRows,
-					foldRow(row),
-					acc);
-			});
-		return A3(_elm_lang$core$Array$foldl, foldAndCombineRow, baseRow, grid);
-	});
+var _user$project$Grid$foldLeftTop = A2(_user$project$Grid$genericFold, _elm_lang$core$Array$foldl, _elm_lang$core$Array$foldl);
+var _user$project$Grid$foldLeftBottom = A2(_user$project$Grid$genericFold, _elm_lang$core$Array$foldl, _elm_lang$core$Array$foldr);
+var _user$project$Grid$foldRightBottom = A2(_user$project$Grid$genericFold, _elm_lang$core$Array$foldr, _elm_lang$core$Array$foldr);
+var _user$project$Grid$foldRightTop = A2(_user$project$Grid$genericFold, _elm_lang$core$Array$foldr, _elm_lang$core$Array$foldl);
 var _user$project$Grid$countIf = F2(
-	function (pred, grid) {
+	function (predicate, grid) {
+		var incrIf = F2(
+			function (x, acc) {
+				return predicate(x) ? (1 + acc) : acc;
+			});
 		return A5(
 			_user$project$Grid$foldLeftTop,
+			incrIf,
 			F2(
-				function (x, acc) {
-					return pred(x) ? (1 + acc) : acc;
-				}),
-			F2(
-				function (x, acc) {
-					return x + acc;
+				function (x, y) {
+					return x + y;
 				}),
 			0,
 			0,
@@ -12210,6 +12199,15 @@ var _user$project$Grid$map = F2(
 		return A2(
 			_elm_lang$core$Array$map,
 			_elm_lang$core$Array$map(f),
+			grid);
+	});
+var _user$project$Grid$filter = F2(
+	function (predicate, grid) {
+		return A2(
+			_user$project$Grid$map,
+			function (x) {
+				return predicate(x) ? _elm_lang$core$Maybe$Just(x) : _elm_lang$core$Maybe$Nothing;
+			},
 			grid);
 	});
 var _user$project$Grid$update = F3(
@@ -18309,9 +18307,8 @@ var _user$project$State$endGame = function (model) {
 		model,
 		{isGameOver: true}) : model;
 };
-var _user$project$State$setUnrevealed = function (model) {
-	var board = model.board;
-	var newBoard = A2(
+var _user$project$State$setUnrevealed = function (board) {
+	return A2(
 		_user$project$Grid$map,
 		function (card) {
 			return _elm_lang$core$Native_Utils.update(
@@ -18319,28 +18316,24 @@ var _user$project$State$setUnrevealed = function (model) {
 				{revealed: false});
 		},
 		board);
-	return _elm_lang$core$Native_Utils.update(
-		model,
-		{board: newBoard});
 };
 var _user$project$State$setCardWords = F2(
 	function (cardWords, model) {
-		var index = function (v) {
-			return _user$project$Vector$getX(v) + (5 * _user$project$Vector$getY(v));
+		var getWord = function (v) {
+			return A2(
+				_elm_lang$core$Maybe$withDefault,
+				'ERROR',
+				A2(
+					_elm_community$list_extra$List_Extra$getAt,
+					_user$project$Vector$getX(v) + (5 * _user$project$Vector$getY(v)),
+					cardWords));
 		};
 		var setWord = F2(
 			function (v, card) {
 				return _elm_lang$core$Native_Utils.update(
 					card,
 					{
-						word: A2(
-							_elm_lang$core$Maybe$withDefault,
-							'ERROR',
-							A3(
-								_elm_lang$core$Basics$flip,
-								_elm_community$list_extra$List_Extra$getAt,
-								cardWords,
-								index(v)))
+						word: getWord(v)
 					});
 			});
 		return _elm_lang$core$Native_Utils.update(
@@ -18351,28 +18344,27 @@ var _user$project$State$setCardWords = F2(
 	});
 var _user$project$State$setCardTypes = F2(
 	function (cardTypes, model) {
-		var index = function (v) {
-			return _user$project$Vector$getX(v) + (5 * _user$project$Vector$getY(v));
+		var getCardType = function (v) {
+			return A2(
+				_elm_lang$core$Maybe$withDefault,
+				_user$project$Types$Blank,
+				A2(
+					_elm_community$list_extra$List_Extra$getAt,
+					_user$project$Vector$getX(v) + (5 * _user$project$Vector$getY(v)),
+					cardTypes));
 		};
-		var setOwner = F2(
+		var setCardType = F2(
 			function (v, card) {
 				return _elm_lang$core$Native_Utils.update(
 					card,
 					{
-						cardType: A2(
-							_elm_lang$core$Maybe$withDefault,
-							_user$project$Types$Blank,
-							A3(
-								_elm_lang$core$Basics$flip,
-								_elm_community$list_extra$List_Extra$getAt,
-								cardTypes,
-								index(v)))
+						cardType: getCardType(v)
 					});
 			});
 		return _elm_lang$core$Native_Utils.update(
 			model,
 			{
-				board: A2(_user$project$Grid$indexedMap, setOwner, model.board)
+				board: A2(_user$project$Grid$indexedMap, setCardType, model.board)
 			});
 	});
 var _user$project$State$setTurn = F2(
@@ -18381,15 +18373,10 @@ var _user$project$State$setTurn = F2(
 			model,
 			{turn: team});
 	});
-var _user$project$State$randomInitialState = function (wl) {
-	var randomTeam = A2(
-		_elm_lang$core$Random$map,
-		function (b) {
-			return b ? _user$project$Types$Blue : _user$project$Types$Red;
-		},
-		_elm_lang$core$Random$bool);
-	var getWordList = function (wl) {
-		var _p1 = wl;
+var _user$project$State$randomInitialState = function (wordListType) {
+	var randomTeam = A2(_elm_community$random_extra$Random_Extra$choice, _user$project$Types$Blue, _user$project$Types$Red);
+	var wordList = function () {
+		var _p1 = wordListType;
 		switch (_p1.ctor) {
 			case 'EasyWords':
 				return _user$project$WordLists$easy_words;
@@ -18398,12 +18385,11 @@ var _user$project$State$randomInitialState = function (wl) {
 			default:
 				return _user$project$WordLists$original;
 		}
-	};
+	}();
 	var randomWords = A2(
 		_elm_lang$core$Random$map,
 		_elm_lang$core$List$take(25),
-		_elm_community$random_extra$Random_List$shuffle(
-			getWordList(wl)));
+		_elm_community$random_extra$Random_List$shuffle(wordList));
 	var cardTypeList = function (activeTeam) {
 		return A2(
 			_elm_lang$core$Basics_ops['++'],
@@ -18423,9 +18409,9 @@ var _user$project$State$randomInitialState = function (wl) {
 					A2(_elm_lang$core$List$repeat, 7, _user$project$Types$Blank),
 					_elm_lang$core$List$singleton(_user$project$Types$KillWord))));
 	};
-	var randomCards = function (t) {
+	var randomCards = function (_p2) {
 		return _elm_community$random_extra$Random_List$shuffle(
-			cardTypeList(t));
+			cardTypeList(_p2));
 	};
 	return A2(
 		_elm_lang$core$Random$generate,
@@ -18433,16 +18419,16 @@ var _user$project$State$randomInitialState = function (wl) {
 		A3(
 			_elm_lang$core$Random$map2,
 			F2(
-				function (ls, _p2) {
-					var _p3 = _p2;
+				function (word, _p3) {
+					var _p4 = _p3;
 					return A3(
 						F3(
 							function (v0, v1, v2) {
 								return {ctor: '_Tuple3', _0: v0, _1: v1, _2: v2};
 							}),
-						_p3._0,
-						_p3._1,
-						ls);
+						_p4._0,
+						_p4._1,
+						word);
 				}),
 			randomWords,
 			A2(
@@ -18456,27 +18442,13 @@ var _user$project$State$randomInitialState = function (wl) {
 				randomTeam)));
 };
 var _user$project$State$setMouseOver = F3(
-	function (b, v, board) {
-		var withMouseOver = F2(
-			function (b, card) {
-				return _elm_lang$core$Native_Utils.update(
-					card,
-					{mouseOver: b});
-			});
-		return A2(
-			_elm_lang$core$Maybe$withDefault,
-			board,
-			A2(
-				_elm_lang$core$Maybe$map,
-				function (card) {
-					return A3(_user$project$Grid$setV, v, card, board);
-				},
-				A2(
-					_elm_lang$core$Maybe$map,
-					function (card) {
-						return A2(withMouseOver, b, card);
-					},
-					A2(_user$project$Grid$lookupV, v, board))));
+	function (isOver, v, board) {
+		var withMouseOver = function (card) {
+			return _elm_lang$core$Native_Utils.update(
+				card,
+				{mouseOver: isOver});
+		};
+		return A3(_user$project$Grid$update, v, withMouseOver, board);
 	});
 var _user$project$State$passTurn = function (model) {
 	return _elm_lang$core$Native_Utils.update(
@@ -18486,15 +18458,15 @@ var _user$project$State$passTurn = function (model) {
 		});
 };
 var _user$project$State$maybePassTurn = F2(
-	function (ct, model) {
-		var _p4 = ct;
-		switch (_p4.ctor) {
+	function (cardType, model) {
+		var _p5 = cardType;
+		switch (_p5.ctor) {
 			case 'Blank':
 				return _user$project$State$passTurn(model);
 			case 'KillWord':
 				return _user$project$State$passTurn(model);
 			default:
-				return (!_elm_lang$core$Native_Utils.eq(_p4._0, model.turn)) ? _user$project$State$passTurn(model) : model;
+				return (!_elm_lang$core$Native_Utils.eq(_p5._0, model.turn)) ? _user$project$State$passTurn(model) : model;
 		}
 	});
 var _user$project$State$reveal = F2(
@@ -18515,40 +18487,37 @@ var _user$project$State$scrollDown = A2(
 	_elm_lang$core$Basics$always(_user$project$Types$NoOp),
 	_elm_lang$dom$Dom_Scroll$toBottom('chat'));
 var _user$project$State$logGuess = F2(
-	function (str, model) {
-		var update = F2(
-			function (str, _p5) {
-				var _p6 = _p5;
-				return {
-					ctor: '_Tuple4',
-					_0: _p6._0,
-					_1: _p6._1,
-					_2: _p6._2,
-					_3: {ctor: '::', _0: str, _1: _p6._3}
-				};
+	function (guess, model) {
+		var addGuess = function (_p6) {
+			var _p7 = _p6;
+			return {
+				ctor: '_Tuple4',
+				_0: _p7._0,
+				_1: _p7._1,
+				_2: _p7._2,
+				_3: {ctor: '::', _0: guess, _1: _p7._3}
+			};
+		};
+		var updatedLog = A2(
+			_elm_lang$core$Maybe$withDefault,
+			{ctor: '[]'},
+			A3(_elm_community$list_extra$List_Extra$updateAt, 0, addGuess, model.log));
+		return A2(
+			_elm_lang$core$Platform_Cmd_ops['!'],
+			_elm_lang$core$Native_Utils.update(
+				model,
+				{log: updatedLog}),
+			{
+				ctor: '::',
+				_0: _user$project$State$scrollDown,
+				_1: {ctor: '[]'}
 			});
-		return function (lg) {
-			return A2(
-				_elm_lang$core$Platform_Cmd_ops['!'],
-				_elm_lang$core$Native_Utils.update(
-					model,
-					{log: lg}),
-				{
-					ctor: '::',
-					_0: _user$project$State$scrollDown,
-					_1: {ctor: '[]'}
-				});
-		}(
-			A2(
-				_elm_lang$core$List$indexedMap,
-				F2(
-					function (i, entry) {
-						return _elm_lang$core$Native_Utils.eq(i, 0) ? A2(update, str, entry) : entry;
-					}),
-				model.log));
 	});
 var _user$project$State$click = F2(
 	function (v, model) {
+		var isValidClick = function (card) {
+			return (model.isGameOver || card.revealed) ? _elm_lang$core$Maybe$Nothing : _elm_lang$core$Maybe$Just(card);
+		};
 		return A2(
 			_elm_lang$core$Maybe$withDefault,
 			A2(
@@ -18569,15 +18538,8 @@ var _user$project$State$click = F2(
 				},
 				A2(
 					_elm_lang$core$Maybe$andThen,
-					function (card) {
-						return card.revealed ? _elm_lang$core$Maybe$Nothing : _elm_lang$core$Maybe$Just(card);
-					},
-					A2(
-						_elm_lang$core$Maybe$andThen,
-						function (card) {
-							return model.isGameOver ? _elm_lang$core$Maybe$Nothing : _elm_lang$core$Maybe$Just(card);
-						},
-						A2(_user$project$Grid$lookupV, v, model.board)))));
+					isValidClick,
+					A2(_user$project$Grid$lookupV, v, model.board))));
 	});
 var _user$project$State$update = F2(
 	function (msg, model) {
@@ -18587,8 +18549,8 @@ var _user$project$State$update = F2(
 				A2(_elm_lang$core$Basics_ops['++'], model.serverAddress, '/submit'),
 				msgs);
 		};
-		var _p7 = msg;
-		switch (_p7.ctor) {
+		var _p8 = msg;
+		switch (_p8.ctor) {
 			case 'NoOp':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
@@ -18600,7 +18562,7 @@ var _user$project$State$update = F2(
 					model,
 					{
 						ctor: '::',
-						_0: send(_p7._0),
+						_0: send(_p8._0),
 						_1: {ctor: '[]'}
 					});
 			case 'Receive':
@@ -18617,7 +18579,7 @@ var _user$project$State$update = F2(
 						_elm_lang$core$Platform_Cmd_ops['!'],
 						model,
 						{ctor: '[]'}),
-					_p7._0);
+					_p8._0);
 			case 'Reset':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
@@ -18633,13 +18595,13 @@ var _user$project$State$update = F2(
 					_0: _user$project$Types$NewGame,
 					_1: {
 						ctor: '::',
-						_0: _user$project$Types$SetTurn(_p7._0._0),
+						_0: _user$project$Types$SetTurn(_p8._0._0),
 						_1: {
 							ctor: '::',
-							_0: _user$project$Types$SetCardTypes(_p7._0._1),
+							_0: _user$project$Types$SetCardTypes(_p8._0._1),
 							_1: {
 								ctor: '::',
-								_0: _user$project$Types$SetCardWords(_p7._0._2),
+								_0: _user$project$Types$SetCardWords(_p8._0._2),
 								_1: {
 									ctor: '::',
 									_0: _user$project$Types$SetHints(false),
@@ -18658,21 +18620,21 @@ var _user$project$State$update = F2(
 						_1: {ctor: '[]'}
 					});
 			case 'SetClicked':
-				return A2(_user$project$State$click, _p7._0, model);
+				return A2(_user$project$State$click, _p8._0, model);
 			case 'SetCardTypes':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
-					A2(_user$project$State$setCardTypes, _p7._0, model),
+					A2(_user$project$State$setCardTypes, _p8._0, model),
 					{ctor: '[]'});
 			case 'SetCardWords':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
-					A2(_user$project$State$setCardWords, _p7._0, model),
+					A2(_user$project$State$setCardWords, _p8._0, model),
 					{ctor: '[]'});
 			case 'SetTurn':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
-					A2(_user$project$State$setTurn, _p7._0, model),
+					A2(_user$project$State$setTurn, _p8._0, model),
 					{ctor: '[]'});
 			case 'PassTurn':
 				return A2(
@@ -18688,7 +18650,7 @@ var _user$project$State$update = F2(
 					_elm_lang$core$Native_Utils.update(
 						model,
 						{
-							log: {ctor: '::', _0: _p7._0, _1: model.log}
+							log: {ctor: '::', _0: _p8._0, _1: model.log}
 						}),
 					{
 						ctor: '::',
@@ -18696,44 +18658,35 @@ var _user$project$State$update = F2(
 						_1: {ctor: '[]'}
 					});
 			case 'NewGame':
-				return function (m) {
-					return A2(
-						_elm_lang$core$Platform_Cmd_ops['!'],
-						_elm_lang$core$Native_Utils.update(
-							m,
-							{
-								log: {ctor: '[]'}
-							}),
-						{ctor: '[]'});
-				}(
-					function (m) {
-						return _elm_lang$core$Native_Utils.update(
-							m,
-							{isGameOver: false});
-					}(
-						function (m) {
-							return _elm_lang$core$Native_Utils.update(
-								m,
-								{hints: false});
-						}(
-							_user$project$State$setUnrevealed(model))));
+				var unrevealedBoard = _user$project$State$setUnrevealed(model.board);
+				return A2(
+					_elm_lang$core$Platform_Cmd_ops['!'],
+					_elm_lang$core$Native_Utils.update(
+						model,
+						{
+							board: unrevealedBoard,
+							hints: false,
+							isGameOver: false,
+							log: {ctor: '[]'}
+						}),
+					{ctor: '[]'});
 			case 'SetWordList':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
 					_elm_lang$core$Native_Utils.update(
 						model,
-						{wordList: _p7._0}),
+						{wordList: _p8._0}),
 					{ctor: '[]'});
 			case 'SetHints':
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
 					_elm_lang$core$Native_Utils.update(
 						model,
-						{hints: _p7._0}),
+						{hints: _p8._0}),
 					{ctor: '[]'});
 			case 'SetClueBar':
 				var str2 = _elm_lang$core$String$trim(
-					_elm_lang$core$String$toUpper(_p7._0));
+					_elm_lang$core$String$toUpper(_p8._0));
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
 					_elm_lang$core$Native_Utils.update(
@@ -18748,7 +18701,7 @@ var _user$project$State$update = F2(
 					A2(
 						_elm_lang$core$Result$withDefault,
 						0,
-						_elm_lang$core$String$toInt(_p7._0)));
+						_elm_lang$core$String$toInt(_p8._0)));
 				return A2(
 					_elm_lang$core$Platform_Cmd_ops['!'],
 					_elm_lang$core$Native_Utils.update(
@@ -18761,7 +18714,7 @@ var _user$project$State$update = F2(
 					_elm_lang$core$Native_Utils.update(
 						model,
 						{
-							board: A3(_user$project$State$setMouseOver, _p7._0, _p7._1, model.board)
+							board: A3(_user$project$State$setMouseOver, _p8._0, _p8._1, model.board)
 						}),
 					{ctor: '[]'});
 			default:
@@ -18772,12 +18725,13 @@ var _user$project$State$update = F2(
 		}
 	});
 var _user$project$State$init = function (location) {
+	var socketProtocol = _elm_lang$core$Native_Utils.eq(location.protocol, 'https:') ? 'wss://' : 'ws://';
 	return A2(
 		_elm_lang$core$Platform_Cmd_ops['!'],
 		_elm_lang$core$Native_Utils.update(
 			_user$project$Types$newModel,
 			{
-				serverAddress: A2(_elm_lang$core$Basics_ops['++'], 'wss://', location.host)
+				serverAddress: A2(_elm_lang$core$Basics_ops['++'], socketProtocol, location.host)
 			}),
 		{ctor: '[]'});
 };
