@@ -44,7 +44,7 @@ class CodenamesBackend(object):
         # Send last messages to client
         for msg in message_history:
             app.logger.info(u'Sending last messages: {}'.format(msg))
-            gevent.spawn(self.send, client, msg)
+            self.send(client, msg)
 
     def send(self, client, data):
         """Send given data to the registered client.
