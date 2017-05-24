@@ -19,8 +19,6 @@ redis = redis.Redis(
     port=15413
 )
 
-message_history = []
-
 
 class CodenamesBackend(object):
     """Interface for registering and updating WebSocket clients."""
@@ -29,6 +27,7 @@ class CodenamesBackend(object):
         self.clients = []
         self.pubsub = redis.pubsub()
         self.pubsub.subscribe(REDIS_CHAN)
+        self.history = []
 
     def __iter_data(self):
         for message in self.pubsub.listen():
@@ -40,11 +39,8 @@ class CodenamesBackend(object):
     def register(self, client):
         """Register a WebSocket connection for Redis updates."""
         self.clients.append(client)
-
-        # Send last messages to client
-        for msg in message_history:
-            app.logger.info(u'Sending last messages: {}'.format(msg))
-            self.send(client, msg)
+        for data in self.history:
+            gevent.spawn(self.send, client, data)
 
     def send(self, client, data):
         """Send given data to the registered client.
@@ -57,6 +53,9 @@ class CodenamesBackend(object):
     def run(self):
         """Listens for new messages in Redis, and sends them to clients."""
         for data in self.__iter_data():
+            if "NewGame" in data:
+                self.history = []
+            self.history.append(data)
             for client in self.clients:
                 gevent.spawn(self.send, client, data)
 
@@ -82,10 +81,6 @@ def inbox(ws):
         message = ws.receive()
 
         if message:
-            if "NewGame" in message:
-                del message_history[:]
-            message_history.append(message)
-
             app.logger.info(u'Inserting message: {}'.format(message))
             redis.publish(REDIS_CHAN, message)
 
