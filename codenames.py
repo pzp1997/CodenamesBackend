@@ -19,12 +19,14 @@ redis = redis.Redis(
     port=15413
 )
 
+message_history = []
+
 
 class CodenamesBackend(object):
     """Interface for registering and updating WebSocket clients."""
 
     def __init__(self):
-        self.clients = list()
+        self.clients = []
         self.pubsub = redis.pubsub()
         self.pubsub.subscribe(REDIS_CHAN)
 
@@ -38,6 +40,11 @@ class CodenamesBackend(object):
     def register(self, client):
         """Register a WebSocket connection for Redis updates."""
         self.clients.append(client)
+
+        # Send last messages to client
+        for msg in message_history:
+            app.logger.info(u'Sending last messages: {}'.format(msg))
+            gevent.spawn(self.send, client, msg)
 
     def send(self, client, data):
         """Send given data to the registered client.
@@ -75,16 +82,20 @@ def inbox(ws):
         message = ws.receive()
 
         if message:
+            if "NewGame" in message:
+                del message_history[:]
+            message_history.append(message)
+
             app.logger.info(u'Inserting message: {}'.format(message))
             redis.publish(REDIS_CHAN, message)
 
 
 @sockets.route('/receive')
 def outbox(ws):
-    """Sends outgoing chat messages, via `CodenamesBackend`."""
+    """Sends outgoing messages, via `CodenamesBackend`."""
     server.register(ws)
 
     while not ws.closed:
-        # Context switch while `ChatBackend.start` is running in the
+        # Context switch while `CodenamesBackend.start` is running in the
         # background.
         gevent.sleep(0.1)
