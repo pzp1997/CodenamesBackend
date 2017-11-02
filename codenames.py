@@ -6,8 +6,6 @@ import gevent
 from flask import Flask, render_template
 from flask_sockets import Sockets
 
-# REDIS_URL = 'redis-15413.c11.us-east-1-3.ec2.cloud.redislabs.com:15413'
-# REDIS_URL = '127.0.0.1:6379'
 REDIS_CHAN = 'codenames'
 
 app = Flask(__name__)
@@ -15,8 +13,8 @@ app.debug = 'DEBUG' in os.environ
 
 sockets = Sockets(app)
 redis = redis.Redis(
-    host='redis-15413.c11.us-east-1-3.ec2.cloud.redislabs.com',
-    port=15413
+    host='redis-12626.c16.us-east-1-3.ec2.cloud.redislabs.com',
+    port=12626
 )
 
 
@@ -62,6 +60,7 @@ class CodenamesBackend(object):
     def start(self):
         """Maintains Redis subscription in the background."""
         gevent.spawn(self.run)
+
 
 server = CodenamesBackend()
 server.start()
